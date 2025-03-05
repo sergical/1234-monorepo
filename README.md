@@ -1,33 +1,79 @@
-# `Turborepo` Vite starter
+# 1234.sh - Simple Developer-Focused Todo CLI
 
-This is a community-maintained example. If you experience a problem, please submit a pull request with a fix. GitHub Issues will be closed.
+A clean, minimal todo list CLI application designed for developers who want to stay focused.
 
-## Using this example
+## Features
 
-Run the following command:
+- **Simple Task Management**: Just title, priority, and inbox status
+- **Priority Levels**: Four levels of priority (1-4)
+- **Inbox Concept**: Keep unprocessed tasks in your inbox
+- **Distraction-Free**: No due dates, attachments, or complex features to manage
+- **Intuitive Commands**: Simple 1-2-3-4 numbered operations for quick task management
 
-```sh
-npx create-turbo@latest -e with-vite
+## Project Structure
+
+This monorepo contains:
+
+- `apps/cli` - The core CLI tool
+- `apps/docs` - Documentation site
+- `apps/web` - Marketing website (1234.sh)
+- `packages/core` - Shared business logic
+- `packages/db` - Database interfaces (SQLite/Supabase)
+- `packages/ui` - UI components for the web applications
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- pnpm 8+
+
+### Development
+
+```bash
+# Install dependencies
+pnpm install
+
+# Start development
+pnpm dev
 ```
 
-## What's inside?
+### Installation Methods
 
-This Turborepo includes the following packages and apps:
+```bash
+# Using npm
+npm install -g 1234-sh
 
-### Apps and Packages
+# Using Homebrew
+brew install 1234
 
-- `docs`: a vanilla [vite](https://vitejs.dev) ts app
-- `web`: another vanilla [vite](https://vitejs.dev) ts app
-- `@repo/ui`: a stub component & utility library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: shared `eslint` configurations
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+# Direct install
+curl -fsSL https://1234.sh/install | sh
+```
 
-Each package and app is 100% [TypeScript](https://www.typescriptlang.org/).
+## Usage
 
-### Utilities
+```bash
+# Add a new task (automatically goes to inbox)
+1234 add "Implement authentication"
 
-This Turborepo has some additional tools already setup for you:
+# Add a task with priority 1 (highest)
+1234 add "Fix critical bug" -p 1
 
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
+# View your inbox
+1234 inbox
+
+# List all tasks
+1234 list
+
+# Mark a task as complete (automatically removes from inbox)
+1234 complete 1
+
+# Move a task in or out of inbox
+1234 move 2 --inbox
+1234 move 3 --no-inbox
+```
+
+## License
+
+MIT

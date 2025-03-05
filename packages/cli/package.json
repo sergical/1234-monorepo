@@ -1,0 +1,66 @@
+{
+  "name": "@1234-sh/cli",
+  "version": "0.0.1",
+  "description": "Developer-focused todo CLI with local-first architecture",
+  "type": "module",
+  "bin": {
+    "1234": "./dist/bin.js",
+    "1234-sh": "./dist/bin.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup src/bin.ts src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/bin.ts src/index.ts --format cjs,esm --watch --dts",
+    "lint": "eslint . --ext .ts,.tsx",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "chalk": "^5.4.1",
+    "commander": "^13.1.0",
+    "conf": "^13.1.0",
+    "date-fns": "^4.1.0",
+    "inquirer": "^12.4.2",
+    "ora": "^8.2.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@1234-sh/eslint-config": "workspace:*",
+    "@1234-sh/typescript-config": "workspace:*",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/inquirer": "^9.0.7",
+    "@types/node": "^18",
+    "eslint": "^9.21.0",
+    "typescript": "5.8.2",
+    "tsup": "^8.4.0",
+    "vitest": "^3.0.7"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "todo",
+    "cli",
+    "task",
+    "productivity",
+    "developer-tools"
+  ],
+  "author": "Sergiy Dybskiy",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sergical/1234-monorepo.git",
+    "directory": "apps/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/sergical/1234-monorepo/issues"
+  },
+  "homepage": "https://1234.sh"
+}

@@ -1,5 +1,5 @@
 {
-  "name": "@repo/ui",
+  "name": "@1234-sh/ui",
   "version": "0.0.0",
   "exports": {
     "./counter": "./components/counter.ts",
@@ -8,12 +8,12 @@
   },
   "license": "MIT",
   "scripts": {
-    "lint": "eslint \"**/*.ts\""
+    "lint": "eslint . --ext .ts,.tsx"
   },
   "devDependencies": {
-    "@repo/eslint-config": "workspace:*",
-    "@repo/typescript-config": "workspace:*",
-    "eslint": "^8.57.0",
-    "typescript": "5.5.4"
+    "@1234-sh/eslint-config": "workspace:*",
+    "@1234-sh/typescript-config": "workspace:*",
+    "eslint": "^9.21.0",
+    "typescript": "5.8.2"
   }
 }

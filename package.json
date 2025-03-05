@@ -1,16 +1,23 @@
 {
+  "name": "@1234-sh/monorepo",
   "private": true,
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\""
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "commitlint": "commitlint --edit"
   },
   "devDependencies": {
-    "eslint": "^8.57.0",
-    "prettier": "^3.2.5",
+    "@commitlint/cli": "^19.7.1",
+    "@commitlint/config-conventional": "^19.7.1",
+    "@types/node": "^18",
+    "eslint": "^9.21.0",
+    "prettier": "^3.5.3",
     "turbo": "^2.4.4"
   },
-  "packageManager": "pnpm@8.15.6",
-  "name": "with-vite"
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "packageManager": "pnpm@8.15.6"
 }

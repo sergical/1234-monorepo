@@ -1,5 +1,5 @@
 {
-  "name": "docs",
+  "name": "@1234-sh/docs",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -7,16 +7,16 @@
     "dev": "vite --clearScreen false",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "lint": "eslint \"src/**/*.ts\""
+    "lint": "eslint . --ext .ts,.tsx"
   },
   "dependencies": {
-    "@repo/ui": "workspace:*"
+    "@1234-sh/ui": "workspace:*"
   },
   "devDependencies": {
-    "@repo/eslint-config": "workspace:*",
-    "@repo/typescript-config": "workspace:*",
-    "eslint": "^8.57.0",
-    "typescript": "5.5.4",
-    "vite": "^5.1.4"
+    "@1234-sh/eslint-config": "workspace:*",
+    "@1234-sh/typescript-config": "workspace:*",
+    "eslint": "^9.21.0",
+    "typescript": "5.8.2",
+    "vite": "^6.2.0"
   }
 }
