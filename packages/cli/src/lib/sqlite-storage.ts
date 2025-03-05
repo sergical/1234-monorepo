@@ -1,36 +1,56 @@
 import Database from "better-sqlite3";
-import { Task, TaskInput } from "../types/task.ts";
-import { Storage } from "./storage.ts";
+import fs from "fs";
+import path from "path";
+import { Task, TaskInput } from "../types/task.js";
+import { Storage } from "./storage.js";
 
 export class SQLiteStorage implements Storage {
   private db: Database.Database;
   private initialized = false;
 
   constructor(dbPath: string) {
-    this.db = new Database(dbPath);
+    // Ensure the directory exists
+    const dbDir = path.dirname(dbPath);
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+    }
+
+    try {
+      this.db = new Database(dbPath);
+    } catch (error) {
+      throw new Error(
+        `Failed to initialize database at ${dbPath}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   }
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
 
-    // Enable WAL mode for better concurrency
-    this.db.pragma("journal_mode = WAL");
+    try {
+      // Enable WAL mode for better concurrency
+      this.db.pragma("journal_mode = WAL");
 
-    // Create tasks table
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS tasks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        priority INTEGER NOT NULL,
-        inbox INTEGER NOT NULL,
-        completed INTEGER NOT NULL,
-        createdAt TEXT NOT NULL,
-        updatedAt TEXT,
-        completedAt TEXT
-      )
-    `);
+      // Create tasks table
+      this.db.exec(`
+        CREATE TABLE IF NOT EXISTS tasks (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          title TEXT NOT NULL,
+          priority INTEGER NOT NULL,
+          inbox INTEGER NOT NULL,
+          completed INTEGER NOT NULL,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT,
+          completedAt TEXT
+        )
+      `);
 
-    this.initialized = true;
+      this.initialized = true;
+    } catch (error) {
+      throw new Error(
+        `Failed to initialize database schema: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   }
 
   private serializeTask(task: Task): Record<string, any> {
@@ -46,16 +66,21 @@ export class SQLiteStorage implements Storage {
     };
   }
 
-  private deserializeTask(row: Record<string, any>): Task {
+  private deserializeTask(row: unknown): Task {
+    const typedRow = row as Record<string, unknown>;
     return {
-      id: row.id,
-      title: row.title,
-      priority: row.priority,
-      inbox: row.inbox === 1,
-      completed: row.completed === 1,
-      createdAt: new Date(row.createdAt),
-      updatedAt: row.updatedAt ? new Date(row.updatedAt) : undefined,
-      completedAt: row.completedAt ? new Date(row.completedAt) : undefined,
+      id: typedRow.id as number,
+      title: typedRow.title as string,
+      priority: typedRow.priority as number,
+      inbox: (typedRow.inbox as number) === 1,
+      completed: (typedRow.completed as number) === 1,
+      createdAt: new Date(typedRow.createdAt as string),
+      updatedAt: typedRow.updatedAt
+        ? new Date(typedRow.updatedAt as string)
+        : undefined,
+      completedAt: typedRow.completedAt
+        ? new Date(typedRow.completedAt as string)
+        : undefined,
     };
   }
 

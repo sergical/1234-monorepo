@@ -12,31 +12,26 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsup src/bin.ts src/index.ts --format cjs,esm --dts",
-    "dev": "tsup src/bin.ts src/index.ts --format cjs,esm --watch --dts",
+    "build": "tsup src/bin.ts src/index.ts --format esm --dts",
+    "dev": "tsup src/bin.ts src/index.ts --format esm --watch --dts",
     "lint": "eslint . --ext .ts,.tsx",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@clack/prompts": "^0.10.0",
     "better-sqlite3": "^11.8.1",
-    "chalk": "^5.4.1",
-    "commander": "^13.1.0",
     "conf": "^13.1.0",
-    "date-fns": "^4.1.0",
-    "inquirer": "^12.4.2",
-    "ora": "^8.2.0",
-    "zod": "^3.24.2"
+    "picocolors": "^1.1.1"
   },
   "devDependencies": {
     "@1234-sh/eslint-config": "workspace:*",
     "@1234-sh/typescript-config": "workspace:*",
     "@types/better-sqlite3": "^7.6.12",
-    "@types/inquirer": "^9.0.7",
     "@types/node": "^18",
     "eslint": "^9.21.0",
-    "typescript": "5.8.2",
     "tsup": "^8.4.0",
+    "typescript": "5.8.2",
     "vitest": "^3.0.7"
   },
   "engines": {

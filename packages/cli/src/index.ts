@@ -1,20 +1,13 @@
-// Export types and utilities for programmatic usage
-
-// Types
+// Core types
 export type { Task, TaskInput } from "./types/task.js";
 
-// Storage
+// Storage interface and implementation
 export { SQLiteStorage } from "./lib/sqlite-storage.js";
 export type { Storage } from "./lib/storage.js";
 
-// Config
-export { getConfig, resetConfig } from "./lib/config.js";
+// Configuration
+export { getConfig } from "./lib/config.js";
 
-// Commands (for programmatic usage)
-export { addTask } from "./commands/add.js";
-export type { AddTaskOptions } from "./commands/add.js";
-export { completeTask } from "./commands/complete.js";
-export { listTasks } from "./commands/list.js";
-export type { ListTasksOptions } from "./commands/list.js";
-export { moveTask } from "./commands/move.js";
-export type { MoveTaskOptions } from "./commands/move.js";
+// Constants
+export const DEFAULT_PRIORITY = 0;
+export const DEFAULT_INBOX = true;

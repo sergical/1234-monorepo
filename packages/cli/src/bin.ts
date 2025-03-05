@@ -1,88 +1,284 @@
 #!/usr/bin/env node
-import chalk from "chalk";
-import { Command } from "commander";
-import { addTask } from "./commands/add.js";
-import { completeTask } from "./commands/complete.js";
-import { listTasks } from "./commands/list.js";
-import { moveTask } from "./commands/move.js";
+import {
+  intro,
+  isCancel,
+  multiselect,
+  note,
+  outro,
+  select,
+  text,
+} from "@clack/prompts";
+import pc from "picocolors";
+import {
+  DEFAULT_INBOX,
+  DEFAULT_PRIORITY,
+  getConfig,
+  SQLiteStorage,
+  Task,
+} from "./index.js";
+
 const packageJson = await import("../package.json", {
   assert: { type: "json" },
 });
-const version = packageJson.default.version;
 
-const program = new Command();
+// Initialize storage
+const config = getConfig();
+const storage = new SQLiteStorage(config.get("dbPath"));
+await storage.initialize();
 
-// Main program configuration
-program
-  .name("1234")
-  .description(
-    "Developer-focused todo CLI with local-first architecture (1234.sh)"
-  )
-  .version(version);
+// Display formatting
+function formatTaskLabel(task: Task, showDate: boolean = true): string {
+  const priority = task.priority === 0 ? "-" : task.priority;
+  const status = task.completed ? "✓" : " ";
+  const date = showDate
+    ? pc.dim(` • ${task.createdAt.toLocaleDateString()}`)
+    : "";
+  const title = task.completed ? pc.dim(task.title) : task.title;
+  const priorityColor =
+    task.priority === 0
+      ? pc.gray
+      : task.priority === 1
+        ? pc.red
+        : task.priority === 2
+          ? pc.yellow
+          : task.priority === 3
+            ? pc.blue
+            : pc.white;
 
-// Command: add
-program
-  .command("add")
-  .description("Add a new task")
-  .argument("<title>", "Task title")
-  .option("-p, --priority <number>", "Task priority (1-4, 1 is highest)", "3")
-  .option("-n, --no-inbox", "Do not add to inbox")
-  .action(addTask);
+  return `${status === "✓" ? pc.green("✓") : " "} ${priorityColor(`[P${priority}]`)} ${title}${task.inbox ? pc.cyan(" (inbox)") : ""}${date}`;
+}
 
-// Command: list
-program
-  .command("list")
-  .description("List all tasks")
-  .option("-p, --priority <number>", "Filter by priority")
-  .option("-s, --status <status>", "Filter by status (pending, completed)")
-  .option(
-    "-f, --format <format>",
-    "Output format (table, json, markdown)",
-    "table"
-  )
-  .action(listTasks);
+function formatTaskDetails(task: Task): string {
+  const priority = task.priority === 0 ? "None" : task.priority;
+  const priorityLabel =
+    task.priority === 1
+      ? "Critical"
+      : task.priority === 2
+        ? "High"
+        : task.priority === 3
+          ? "Medium"
+          : task.priority === 4
+            ? "Low"
+            : "None";
 
-// Command: inbox
-program
-  .command("inbox")
-  .description("List tasks in your inbox")
-  .option(
-    "-f, --format <format>",
-    "Output format (table, json, markdown)",
-    "table"
-  )
-  .action((options) => listTasks({ ...options, inbox: true }));
+  return [
+    "",
+    pc.bold("Task Details"),
+    "─".repeat(40),
+    `${pc.dim("ID:")}        ${task.id}`,
+    `${pc.dim("Title:")}     ${task.title}`,
+    `${pc.dim("Priority:")}  P${priority} - ${priorityLabel}`,
+    `${pc.dim("Status:")}    ${task.completed ? "Completed" : task.inbox ? "In Inbox" : "Active"}`,
+    `${pc.dim("Created:")}   ${task.createdAt.toLocaleString()}`,
+    task.completedAt
+      ? `${pc.dim("Completed:")} ${task.completedAt.toLocaleString()}`
+      : "",
+    "─".repeat(40),
+    "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
 
-// Command: complete
-program
-  .command("complete")
-  .description("Mark a task as complete")
-  .argument("<id>", "Task ID")
-  .action(completeTask);
+// Task management functions
+async function addTask(title?: string): Promise<void> {
+  const taskTitle =
+    title ||
+    ((await text({
+      message: "Enter task title",
+      validate: (value) => {
+        if (!value) return "Please enter a title";
+        return;
+      },
+    })) as string);
 
-// Command: move
-program
-  .command("move")
-  .description("Move a task in or out of the inbox")
-  .argument("<id>", "Task ID")
-  .option("--inbox", "Move to inbox")
-  .option("--no-inbox", "Remove from inbox")
-  .action(moveTask);
+  if (isCancel(taskTitle)) process.exit(0);
 
-// Error handling for invalid commands
-program.on("command:*", () => {
-  console.error(
-    chalk.red(
-      `Invalid command: ${program.args.join(" ")}\nSee --help for a list of available commands.`
-    )
+  const task = await storage.addTask({
+    title: taskTitle,
+    priority: DEFAULT_PRIORITY,
+    inbox: DEFAULT_INBOX,
+    completed: false,
+    createdAt: new Date(),
+  });
+
+  console.log(pc.green("\n✓ Task added to inbox"));
+  console.log(formatTaskDetails(task));
+}
+
+async function assignPriority(taskId: number): Promise<void> {
+  const task = await storage.getTask(taskId);
+  if (!task) {
+    console.log(pc.red("Task not found"));
+    return;
+  }
+
+  const priority = (await select({
+    message: "Select priority",
+    options: [
+      { value: 1, label: "1 - Critical" },
+      { value: 2, label: "2 - High" },
+      { value: 3, label: "3 - Medium" },
+      { value: 4, label: "4 - Low" },
+    ],
+  })) as number;
+
+  if (isCancel(priority)) return;
+
+  task.priority = priority;
+  task.inbox = false; // Move out of inbox when priority is assigned
+  task.updatedAt = new Date();
+  await storage.updateTask(task);
+  console.log(
+    pc.green(`Task priority set to ${priority} and moved out of inbox`)
   );
+}
+
+async function showInteractiveTaskList(
+  tasks: Task[],
+  allowComplete: boolean = true
+): Promise<void> {
+  if (tasks.length === 0) {
+    note("No tasks found", "Empty");
+    return;
+  }
+
+  // Sort tasks by priority (0 priority goes last)
+  const sortedTasks = [...tasks].sort((a, b) => {
+    if (a.priority === 0) return 1;
+    if (b.priority === 0) return -1;
+    return a.priority - b.priority;
+  });
+
+  if (!allowComplete) {
+    // For completed tasks (log), just show the list
+    console.log(""); // Empty line for spacing
+    sortedTasks.forEach((task) => {
+      console.log(formatTaskLabel(task));
+    });
+    console.log(""); // Empty line for spacing
+    return;
+  }
+
+  // For active tasks, show interactive multiselect
+  const selected = (await multiselect({
+    message: "Select tasks to complete (space to select)",
+    options: sortedTasks.map((task) => ({
+      value: task.id.toString(),
+      label: formatTaskLabel(task, true), // Show dates for active tasks
+    })),
+    required: false,
+  })) as string[];
+
+  if (isCancel(selected)) return;
+
+  if (selected.length > 0) {
+    for (const id of selected) {
+      const task = await storage.getTask(parseInt(id));
+      if (task) {
+        task.completed = true;
+        task.completedAt = new Date();
+        await storage.updateTask(task);
+      }
+    }
+    console.log(
+      pc.green(
+        `\n✓ Completed ${selected.length} ${selected.length === 1 ? "task" : "tasks"}`
+      )
+    );
+  }
+}
+
+async function main() {
+  intro(pc.bold(`1234 CLI v${packageJson.default.version}`));
+
+  const args = process.argv.slice(2);
+  const command = args[0];
+
+  if (command === "add" && args[1]) {
+    await addTask(args[1]);
+  } else if (command === "inbox") {
+    const tasks = await storage.getTasks();
+    const inboxTasks = tasks.filter((t) => t.inbox && !t.completed);
+    await showInteractiveTaskList(inboxTasks);
+  } else if (command === "list") {
+    const tasks = await storage.getTasks();
+    const activeTasks = tasks.filter((t) => !t.inbox && !t.completed);
+    await showInteractiveTaskList(activeTasks);
+  } else if (command === "log") {
+    const tasks = await storage.getTasks();
+    const completedTasks = tasks.filter((t) => t.completed);
+    await showInteractiveTaskList(completedTasks, false);
+  } else if (command === "priority" && args[1]) {
+    await assignPriority(parseInt(args[1]));
+  } else {
+    // Interactive mode
+    const action = await select({
+      message: "What would you like to do?",
+      options: [
+        { value: "add", label: "Add a new task" },
+        { value: "inbox", label: "View inbox" },
+        { value: "list", label: "List active tasks" },
+        { value: "log", label: "View completed tasks" },
+        { value: "priority", label: "Set task priority" },
+      ],
+    });
+
+    if (isCancel(action)) process.exit(0);
+
+    switch (action) {
+      case "add":
+        await addTask();
+        break;
+
+      case "inbox": {
+        const tasks = await storage.getTasks();
+        const inboxTasks = tasks.filter((t) => t.inbox && !t.completed);
+        await showInteractiveTaskList(inboxTasks);
+        break;
+      }
+
+      case "list": {
+        const tasks = await storage.getTasks();
+        const activeTasks = tasks.filter((t) => !t.inbox && !t.completed);
+        await showInteractiveTaskList(activeTasks);
+        break;
+      }
+
+      case "log": {
+        const tasks = await storage.getTasks();
+        const completedTasks = tasks.filter((t) => t.completed);
+        await showInteractiveTaskList(completedTasks, false);
+        break;
+      }
+
+      case "priority": {
+        const tasks = await storage.getTasks();
+        const inboxTasks = tasks.filter((t) => t.inbox && !t.completed);
+        if (inboxTasks.length === 0) {
+          note("No tasks in inbox", "Empty inbox");
+          break;
+        }
+
+        const taskId = (await select({
+          message: "Select task to set priority",
+          options: inboxTasks.map((task) => ({
+            value: task.id,
+            label: formatTaskLabel(task),
+          })),
+        })) as number;
+
+        if (isCancel(taskId)) break;
+        await assignPriority(taskId);
+        break;
+      }
+    }
+  }
+
+  outro("Done!");
+}
+
+main().catch((error) => {
+  console.error("Error:", error instanceof Error ? error.message : error);
   process.exit(1);
 });
-
-// Parse command line arguments
-program.parse();
-
-// If no arguments, show help
-if (!process.argv.slice(2).length) {
-  program.outputHelp();
-}
