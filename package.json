@@ -6,7 +6,8 @@
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "commitlint": "commitlint --edit"
+    "commitlint": "commitlint --edit",
+    "prepare": "./scripts/setup-git-hooks.sh"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.7.1",
