@@ -28,7 +28,6 @@ await storage.initialize();
 
 // Display formatting
 function formatTaskLabel(task: Task, showDate: boolean = true): string {
-  const priority = task.priority === 0 ? "-" : task.priority;
   const status = task.completed ? "✓" : " ";
   const date = showDate
     ? pc.dim(` • ${task.createdAt.toLocaleDateString()}`)
@@ -45,11 +44,13 @@ function formatTaskLabel(task: Task, showDate: boolean = true): string {
             ? pc.blue
             : pc.white;
 
-  return `${status === "✓" ? pc.green("✓") : " "} ${priorityColor(`[P${priority}]`)} ${title}${task.inbox ? pc.cyan(" (inbox)") : ""}${date}`;
+  const priorityLabel =
+    task.priority === 0 ? "" : ` ${priorityColor(`[P${task.priority}]`)}`;
+
+  return `${status === "✓" ? pc.green("✓") : " "}${priorityLabel} ${title}${task.inbox ? pc.cyan(" (inbox)") : ""}${date}`;
 }
 
 function formatTaskDetails(task: Task): string {
-  const priority = task.priority === 0 ? "None" : task.priority;
   const priorityLabel =
     task.priority === 1
       ? "Critical"
@@ -61,13 +62,18 @@ function formatTaskDetails(task: Task): string {
             ? "Low"
             : "None";
 
+  const priorityDisplay =
+    task.priority === 0
+      ? `${pc.dim("Priority:")}  None`
+      : `${pc.dim("Priority:")}  P${task.priority} - ${priorityLabel}`;
+
   return [
     "",
     pc.bold("Task Details"),
     "─".repeat(40),
     `${pc.dim("ID:")}        ${task.id}`,
     `${pc.dim("Title:")}     ${task.title}`,
-    `${pc.dim("Priority:")}  P${priority} - ${priorityLabel}`,
+    priorityDisplay,
     `${pc.dim("Status:")}    ${task.completed ? "Completed" : task.inbox ? "In Inbox" : "Active"}`,
     `${pc.dim("Created:")}   ${task.createdAt.toLocaleString()}`,
     task.completedAt
@@ -81,7 +87,7 @@ function formatTaskDetails(task: Task): string {
 }
 
 // Task management functions
-async function addTask(title?: string): Promise<void> {
+async function addTask(title?: string, priority?: number): Promise<void> {
   const taskTitle =
     title ||
     ((await text({
@@ -94,15 +100,34 @@ async function addTask(title?: string): Promise<void> {
 
   if (isCancel(taskTitle)) process.exit(0);
 
+  // If no priority was provided and we're in interactive mode, ask for it
+  let taskPriority = priority;
+  if (taskPriority === undefined && !title) {
+    const setPriority = await select({
+      message: "Set priority now?",
+      options: [
+        { value: "no", label: "No, add to inbox" },
+        { value: "1", label: "P1 - Critical" },
+        { value: "2", label: "P2 - High" },
+        { value: "3", label: "P3 - Medium" },
+        { value: "4", label: "P4 - Low" },
+      ],
+    });
+
+    if (!isCancel(setPriority) && setPriority !== "no") {
+      taskPriority = parseInt(setPriority);
+    }
+  }
+
   const task = await storage.addTask({
     title: taskTitle,
-    priority: DEFAULT_PRIORITY,
-    inbox: DEFAULT_INBOX,
+    priority: taskPriority || DEFAULT_PRIORITY,
+    inbox: taskPriority ? false : DEFAULT_INBOX, // If priority is set, don't put in inbox
     completed: false,
     createdAt: new Date(),
   });
 
-  console.log(pc.green("\n✓ Task added to inbox"));
+  console.log(pc.green("\n✓ Task added" + (task.inbox ? " to inbox" : "")));
   console.log(formatTaskDetails(task));
 }
 
@@ -189,18 +214,124 @@ async function showInteractiveTaskList(
   }
 }
 
+async function showInbox(): Promise<void> {
+  const tasks = await storage.getTasks();
+  const inboxTasks = tasks.filter((t) => t.inbox && !t.completed);
+
+  if (inboxTasks.length === 0) {
+    note("No tasks in inbox", "Empty");
+    return;
+  }
+
+  while (true) {
+    // Show all inbox tasks
+    console.log("\nInbox tasks:");
+    inboxTasks.forEach((task) => {
+      console.log(formatTaskLabel(task));
+    });
+    console.log(""); // Empty line for spacing
+
+    // Select a task to process
+    const taskToProcess = await select({
+      message: "Select a task to process (or ESC to exit)",
+      options: [
+        ...inboxTasks.map((task) => ({
+          value: task.id.toString(),
+          label: formatTaskLabel(task),
+        })),
+      ],
+    });
+
+    if (isCancel(taskToProcess)) break;
+
+    // Process the selected task
+    const selectedTask = inboxTasks.find(
+      (t) => t.id.toString() === taskToProcess
+    );
+    if (!selectedTask) continue;
+
+    console.log("\n" + formatTaskDetails(selectedTask));
+
+    const action = await select({
+      message: "What would you like to do with this task?",
+      options: [
+        { value: "p1", label: "Set Priority 1 - Critical" },
+        { value: "p2", label: "Set Priority 2 - High" },
+        { value: "p3", label: "Set Priority 3 - Medium" },
+        { value: "p4", label: "Set Priority 4 - Low" },
+        { value: "complete", label: "Mark as completed" },
+        { value: "back", label: "Back to inbox" },
+      ],
+    });
+
+    if (isCancel(action) || action === "back") continue;
+
+    if (action.startsWith("p")) {
+      const priority = parseInt(action[1]);
+      selectedTask.priority = priority;
+      selectedTask.inbox = false;
+      selectedTask.updatedAt = new Date();
+      await storage.updateTask(selectedTask);
+      console.log(
+        pc.green(`✓ Priority set to ${priority} and moved out of inbox`)
+      );
+      // Remove task from inbox list
+      inboxTasks.splice(inboxTasks.indexOf(selectedTask), 1);
+    } else if (action === "complete") {
+      selectedTask.completed = true;
+      selectedTask.completedAt = new Date();
+      await storage.updateTask(selectedTask);
+      console.log(pc.green("✓ Task completed"));
+      // Remove task from inbox list
+      inboxTasks.splice(inboxTasks.indexOf(selectedTask), 1);
+    }
+
+    // If no more tasks in inbox, exit
+    if (inboxTasks.length === 0) {
+      note("No more tasks in inbox", "Empty");
+      break;
+    }
+  }
+}
+
 async function main() {
   intro(pc.bold(`1234 CLI v${packageJson.default.version}`));
 
   const args = process.argv.slice(2);
   const command = args[0];
 
-  if (command === "add" && args[1]) {
-    await addTask(args[1]);
+  if (command === "add") {
+    // Parse add command arguments
+    let title: string | undefined;
+    let priority: number | undefined;
+
+    // Find the title (everything between first argument and any flag)
+    const flagIndex = args.findIndex((arg) => arg.startsWith("-"));
+    if (flagIndex === -1) {
+      // No flags, everything after 'add' is the title
+      title = args.slice(1).join(" ");
+    } else {
+      // Title is everything between 'add' and the first flag
+      title = args.slice(1, flagIndex).join(" ");
+    }
+
+    // Parse priority flag if present
+    const priorityFlag = args.find(
+      (arg) => arg === "-p" || arg === "--priority"
+    );
+    if (priorityFlag) {
+      const priorityValue = args[args.indexOf(priorityFlag) + 1];
+      if (priorityValue && /^[1-4]$/.test(priorityValue)) {
+        priority = parseInt(priorityValue);
+      } else {
+        console.log(pc.red("Invalid priority. Must be between 1 and 4."));
+        process.exit(1);
+      }
+    }
+
+    await addTask(title || undefined, priority);
   } else if (command === "inbox") {
-    const tasks = await storage.getTasks();
-    const inboxTasks = tasks.filter((t) => t.inbox && !t.completed);
-    await showInteractiveTaskList(inboxTasks);
+    await showInbox();
   } else if (command === "list") {
     const tasks = await storage.getTasks();
     const activeTasks = tasks.filter((t) => !t.inbox && !t.completed);
@@ -217,10 +348,9 @@ async function main() {
       message: "What would you like to do?",
       options: [
         { value: "add", label: "Add a new task" },
-        { value: "inbox", label: "View inbox" },
+        { value: "inbox", label: "View and process inbox" },
         { value: "list", label: "List active tasks" },
         { value: "log", label: "View completed tasks" },
-        { value: "priority", label: "Set task priority" },
       ],
     });
 
@@ -231,12 +361,9 @@ async function main() {
         await addTask();
         break;
 
-      case "inbox": {
-        const tasks = await storage.getTasks();
-        const inboxTasks = tasks.filter((t) => t.inbox && !t.completed);
-        await showInteractiveTaskList(inboxTasks);
+      case "inbox":
+        await showInbox();
         break;
-      }
 
       case "list": {
         const tasks = await storage.getTasks();
@@ -249,27 +376,6 @@ async function main() {
         const tasks = await storage.getTasks();
         const completedTasks = tasks.filter((t) => t.completed);
         await showInteractiveTaskList(completedTasks, false);
-        break;
-      }
-
-      case "priority": {
-        const tasks = await storage.getTasks();
-        const inboxTasks = tasks.filter((t) => t.inbox && !t.completed);
-        if (inboxTasks.length === 0) {
-          note("No tasks in inbox", "Empty inbox");
-          break;
-        }
-
-        const taskId = (await select({
-          message: "Select task to set priority",
-          options: inboxTasks.map((task) => ({
-            value: task.id,
-            label: formatTaskLabel(task),
-          })),
-        })) as number;
-
-        if (isCancel(taskId)) break;
-        await assignPriority(taskId);
         break;
       }
     }
